@@ -1,0 +1,11 @@
+dn: uid=geoff,ou=members,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: geoff
+sn: Hacker
+givenName: Geoff
+cn: Geoff Hacker
+displayName: Geoff Hacker
+uidNumber: 9001
+gidNumber: 5000
+homeDirectory: /home/geoff

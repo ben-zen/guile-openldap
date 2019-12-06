@@ -1,0 +1,13 @@
+dn: ou=members,dc=example,dc=com
+objectClass: organizationalUnit
+ou: members
+
+dn: ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=laserTrained,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: laserTrained
+gidNumber: 5000
+
