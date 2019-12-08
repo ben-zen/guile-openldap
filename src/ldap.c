@@ -1,14 +1,57 @@
 #include <ldap.h>
 #include <stdio.h>
-//#include <libguile.h>
+#include <libguile.h>
 
-/* mark */
+struct ldap_connection {
+  LDAP *ld;
+  bool bound;
+};
 
-/* free */
+static int ldap_version = 3;
 
-/* print */
+static SCM ldap_connection_type;
 
-/* equalp */
+void init_ldap_type (void) {
+  SCM name = scm_from_utf8_symbol("ldap_connection");
+  SCM slots = scm_list_1(scm_from_utf8_symbol("connection"));
+  scm_t_struct_finalize finalizer = NULL;
+
+  ldap_connection_type = scm_make_foreign_object_type(name, slots, finalizer);
+}
+
+SCM make_ldap(SCM url_scm) {
+  struct ldap_connection *ldap = (struct ldap_connection *) scm_gc_malloc(sizeof(struct ldap_connection), "ldap_connection");
+  ldap->ld = NULL;
+  ldap->bound = false;
+  // Get the string from the url
+  char *url_str = scm_to_utf8_stringn(url_scm, NULL);
+  // handle a null url_str
+  int err = ldap_initialize(&(ldap->ld), url_str);
+  bound = true;
+  // handle errors
+  err = ldap_set_option(ldap->ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_version);
+  
+  free(url_str);
+  return scm_make_foreign_object_1(ldap_connection_type, ldap);
+}
+
+SCM unbind_ldap(SCM ldap_obj) {
+  scm_assert_foreign_object_type(ldap_connection_type, ldap_obj);
+
+  struct ldap_connection *ldap = scm_foreign_object_ref(ldap_obj, 0);
+  if (ldap->bound) {
+    ldap_unbind(ldap->ld);
+    ldap->bound = false;
+  }
+
+  return SCM_UNSPECIFIED;
+}
+
+// Currently synchronous.
+SCM search_ldap(SCM ldap_obj, SCM bind_scm, SCM scope, SCM search_scm, SCM attrs_scm) {
+  scm_assert_foreign_object_type(ldap_connection_type, ldap_obj);
+  
+}
 
 void print_berval(struct berval *val) {
   for (int i = 0; i < val->bv_len; i++) {
@@ -19,8 +62,6 @@ void print_berval(struct berval *val) {
     putchar(val_i);
   }
 };
-
-static int ldap_version = 3;
 
 int main (int argc, char** argv) {
   char *ldap_url = (argc > 1) ? argv[1] : "ldap://127.0.0.1:389/";
