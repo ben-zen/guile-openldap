@@ -1,0 +1,11 @@
+dn: uid=sasha,ou=members,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: sasha
+sn: Murphy
+givenName: Sasha
+cn: Sasha Murphy
+displayName: Sasha Murphy
+uidNumber: 9002
+gidNumber: 5000
+homeDirectory: /home/sasha
