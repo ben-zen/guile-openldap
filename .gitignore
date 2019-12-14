@@ -1,2 +1,6 @@
 # Ignore emacs backup files
 *~
+
+# Ignore objects and binaries
+*.o
+*.so
