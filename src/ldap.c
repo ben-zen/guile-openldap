@@ -3,6 +3,20 @@
 #include <stdio.h>
 #include <libguile.h>
 
+// Utility methods for wrapping various calls to free.
+
+void free_values_len(void *values) {
+  ldap_value_free_len((struct berval **)values);
+}
+
+void free_msg(void *msg) {
+  ldap_msgfree((LDAPMessage *)msg);
+}
+
+void free_ber(void *ber) {
+  ber_free((BerElement *)ber, 0 /* freebuf */);
+}
+
 typedef struct ldap_connection {
   LDAP *ld;
   bool bound;
@@ -21,18 +35,20 @@ void init_ldap_type (void) {
 }
 
 SCM make_ldap(SCM url_scm) {
+  scm_dynwind_begin(0);
   ldap_connection_t *ldap = (ldap_connection_t *) scm_gc_malloc(sizeof(ldap_connection_t), "ldap_connection");
   ldap->ld = NULL;
   ldap->bound = false;
   // Get the string from the url
   char *url_str = scm_to_utf8_stringn(url_scm, NULL);
+  scm_dynwind_free(url_str);
   // handle a null url_str
   int err = ldap_initialize(&(ldap->ld), url_str);
   ldap->bound = true;
   // handle errors
   err = ldap_set_option(ldap->ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_version);
-  
-  free(url_str);
+
+  scm_dynwind_end();
   return scm_make_foreign_object_1(ldap_connection_type, ldap);
 }
 
@@ -48,19 +64,25 @@ SCM unbind_ldap(SCM ldap_obj) {
   return SCM_UNSPECIFIED;
 }
 
-
 // Currently synchronous. This is a good candidate for keywords.
 SCM search_ldap(SCM ldap_obj, SCM bind_scm, SCM scope_scm, SCM search_scm, SCM attrs_scm) {
+  scm_dynwind_begin(0);
   scm_assert_foreign_object_type(ldap_connection_type, ldap_obj);
   ldap_connection_t *connection = scm_foreign_object_ref(ldap_obj, 0);
   char *bind_str = scm_to_utf8_stringn(bind_scm, NULL /* len */);
+  scm_dynwind_free(bind_str);
   int scope = scm_to_int(scope_scm);
   char *search_str = scm_to_utf8_stringn(search_scm, NULL /* len */);
+  scm_dynwind_free(search_str);
   LDAPMessage *results = NULL;
   int err = ldap_search_ext_s(connection->ld, bind_str, scope, search_str,
                               NULL /* attrs[] */, 0 /* attrsonly */,
                               NULL /* serverctrls */, NULL /* clientctrls */,
                               NULL /* timeout */, 0 /* sizelimit */, &results);
+
+  if (results != NULL) {
+    scm_dynwind_unwind_handler(free_msg, results, SCM_F_WIND_EXPLICITLY);
+  }
 
   // Parse returned us responses, let's navigate that.
   SCM ldap_entries_scm = SCM_EOL;
@@ -69,9 +91,13 @@ SCM search_ldap(SCM ldap_obj, SCM bind_scm, SCM scope_scm, SCM search_scm, SCM a
     BerElement *ber = NULL;
     SCM entry_scm = SCM_EOL;
     char *attribute_name = ldap_first_attribute(connection->ld, message, &ber);
+    scm_dynwind_unwind_handler(free_ber, ber, SCM_F_WIND_EXPLICITLY);
     while (attribute_name != NULL) {
+      scm_dynwind_begin(0); // Create a context for this attribute.
+      scm_dynwind_unwind_handler(ldap_memfree, attribute_name, SCM_F_WIND_EXPLICITLY);
       SCM attribute_scm = scm_cons(scm_from_utf8_string(attribute_name), SCM_EOL);
       struct berval **values = ldap_get_values_len(connection->ld, message, attribute_name);
+      scm_dynwind_unwind_handler(free_values_len, values, SCM_F_WIND_EXPLICITLY);
       int values_count = ldap_count_values_len(values);
       for (int i = 0; i < values_count; i++) {
         attribute_scm =
@@ -86,19 +112,18 @@ SCM search_ldap(SCM ldap_obj, SCM bind_scm, SCM scope_scm, SCM search_scm, SCM a
         scm_append(
           scm_list_2(entry_scm, scm_cons(attribute_scm, SCM_EOL)));
 
-      ldap_value_free_len(values);
-      ldap_memfree(attribute_name);
       attribute_name = NULL;
       attribute_name = ldap_next_attribute(connection->ld, message, ber);
+      scm_dynwind_end();
     }
 
     ldap_entries_scm =
       scm_append(scm_list_2(ldap_entries_scm, scm_cons(entry_scm, SCM_EOL)));
-    ber_free(ber, 0);
+
     message = ldap_next_entry(connection->ld, message);
   }
 
-  ldap_msgfree(results);
+  scm_dynwind_end();
   return ldap_entries_scm;
 }
 
