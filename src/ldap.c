@@ -112,10 +112,35 @@ SCM search_ldap(SCM ldap_obj, SCM rest) {
     search_str = scm_to_utf8_stringn(search_scm, NULL /* len */);
     scm_dynwind_free(search_str);
   }
-  
+
+  char **attrs = NULL;
+  if (!SCM_UNBNDP(attrs_scm)) {
+    // Count how many attributes we need, then allocate an array for them -- and
+    // include an extra null.
+    int attr_count = scm_to_int(scm_length(attrs_scm));
+    if (attr_count > 0) {
+      size_t attrs_size = (sizeof (char *)) * (attr_count + 1);
+      attrs = malloc(attrs_size);
+      scm_dynwind_free(attrs);
+      memset(attrs, 0, attrs_size);
+
+      char **attr_iter = attrs;
+      SCM attr_scm_iter = attrs_scm;
+      do {
+        SCM attr = scm_car(attr_scm_iter);
+        char *attr_str = scm_to_utf8_stringn(attr, NULL /* len */);
+        scm_dynwind_free(attr_str);
+        *attr_iter = attr_str;
+
+        attr_iter++;
+        attr_scm_iter = scm_cdr(attr_scm_iter);
+      } while (attr_scm_iter != SCM_EOL);
+    }
+  }
+
   LDAPMessage *results = NULL;
   int err = ldap_search_ext_s(connection->ld, base_str, scope, search_str,
-                              NULL /* attrs[] */, 0 /* attrsonly */,
+                              attrs, 0 /* attrsonly */,
                               NULL /* serverctrls */, NULL /* clientctrls */,
                               NULL /* timeout */, 0 /* sizelimit */, &results);
 
