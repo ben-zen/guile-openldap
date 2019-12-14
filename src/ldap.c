@@ -25,6 +25,16 @@ typedef struct ldap_connection {
 static int ldap_version = 3;
 
 static SCM ldap_connection_type;
+static SCM key_base_param;
+static SCM key_bind_param;
+static SCM key_scope_param;
+static SCM key_filter_param;
+static SCM key_attrs_param;
+static SCM key_attrsonly_param;
+static SCM key_serverctrls_param;
+static SCM key_clientctrls_param;
+static SCM key_timeout_param;
+static SCM key_sizelimit_param;
 
 void init_ldap_type (void) {
   SCM name = scm_from_utf8_symbol("ldap_connection");
@@ -65,17 +75,46 @@ SCM unbind_ldap(SCM ldap_obj) {
 }
 
 // Currently synchronous. This is a good candidate for keywords.
-SCM search_ldap(SCM ldap_obj, SCM bind_scm, SCM scope_scm, SCM search_scm, SCM attrs_scm) {
+SCM search_ldap(SCM ldap_obj, SCM rest) {
   scm_dynwind_begin(0);
+
+  SCM base_scm = SCM_UNDEFINED;
+  SCM scope_scm = SCM_UNDEFINED;
+  SCM search_scm = SCM_UNDEFINED;
+  SCM attrs_scm = SCM_UNDEFINED;
+
+  scm_c_bind_keyword_arguments("search-ldap", rest, 0,
+                               key_base_param, &base_scm,
+                               key_scope_param, &scope_scm,
+                               key_filter_param, &search_scm,
+                               key_attrs_param, &attrs_scm,
+                               SCM_UNDEFINED);
+  
   scm_assert_foreign_object_type(ldap_connection_type, ldap_obj);
   ldap_connection_t *connection = scm_foreign_object_ref(ldap_obj, 0);
-  char *bind_str = scm_to_utf8_stringn(bind_scm, NULL /* len */);
-  scm_dynwind_free(bind_str);
-  int scope = scm_to_int(scope_scm);
-  char *search_str = scm_to_utf8_stringn(search_scm, NULL /* len */);
-  scm_dynwind_free(search_str);
+
+  char *base_str = NULL;
+  if (SCM_UNBNDP(base_scm)) {
+    // We can define a default base or have this report an error
+  } else {
+    base_str = scm_to_utf8_stringn(base_scm, NULL /* len */);
+    scm_dynwind_free(base_str);
+  }
+
+  int scope = LDAP_SCOPE_BASE;
+  if (!SCM_UNBNDP(scope_scm)) {
+    scope = scm_to_int(scope_scm);
+  }
+
+  char *search_str = NULL;
+  if (SCM_UNBNDP(search_scm)) {
+  } else {
+    search_str = scm_to_utf8_stringn(search_scm, NULL /* len */);
+    scm_dynwind_free(search_str);
+  }
+  
   LDAPMessage *results = NULL;
-  int err = ldap_search_ext_s(connection->ld, bind_str, scope, search_str,
+  int err = ldap_search_ext_s(connection->ld, base_str, scope, search_str,
                               NULL /* attrs[] */, 0 /* attrsonly */,
                               NULL /* serverctrls */, NULL /* clientctrls */,
                               NULL /* timeout */, 0 /* sizelimit */, &results);
@@ -127,11 +166,26 @@ SCM search_ldap(SCM ldap_obj, SCM bind_scm, SCM scope_scm, SCM search_scm, SCM a
   return ldap_entries_scm;
 }
 
+
+void init_keywords() {
+  key_base_param = scm_from_utf8_keyword("base");
+  key_bind_param = scm_from_utf8_keyword("bind");
+  key_scope_param = scm_from_utf8_keyword("scope");
+  key_filter_param = scm_from_utf8_keyword("filter");
+  key_attrs_param = scm_from_utf8_keyword("attrs");
+  key_attrsonly_param = scm_from_utf8_keyword("attrs-only");
+  key_serverctrls_param = scm_from_utf8_keyword("server-ctrls");
+  key_clientctrls_param = scm_from_utf8_keyword("client-ctrls");
+  key_timeout_param = scm_from_utf8_keyword("timeout");
+  key_sizelimit_param = scm_from_utf8_keyword("size-limit");
+  
+}
+
 SCM init_gldap() {
   scm_c_define_gsubr("make-ldap", 1, 0, 0, make_ldap);
   scm_c_define_gsubr("unbind-ldap", 1, 0, 0, unbind_ldap);
-  scm_c_define_gsubr("search-ldap", 5, 0, 0, search_ldap);
-
+  scm_c_define_gsubr("search-ldap", 1, 0, 1, search_ldap);
+  init_keywords();
   init_ldap_type();
 }
 
