@@ -1,4 +1,4 @@
-dn: uid=sasha,ou=members,dc=example,dc=com
+dn: cn=sasha,ou=members,dc=example,dc=com
 objectClass: inetOrgPerson
 objectClass: posixAccount
 uid: sasha
@@ -6,6 +6,7 @@ sn: Murphy
 givenName: Sasha
 cn: Sasha Murphy
 displayName: Sasha Murphy
+userPassword: {SSHA}vIwF4UFmZXA8lfctiTryqeKqd8iMinQd
 uidNumber: 9002
 gidNumber: 5000
 homeDirectory: /home/sasha
