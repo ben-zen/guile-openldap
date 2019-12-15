@@ -4,11 +4,11 @@
 
 (display "Binding to a user with simple auth:") (newline)
 (write (bind-ldap localhost-ldap
-                  #:bind-method 'bind-simple
+                  'bind-simple
                   #:name "cn=geoff,ou=members,dc=example,dc=com"
                   #:cred "hacker")) (newline)
 
 (write (bind-ldap localhost-ldap
-                  #:bind-method 'bind-simple
+                  'bind-simple
                   #:name "cn=sasha,ou=members,dc=example,dc=com"
                   #:cred "cracker")) (newline)

@@ -89,7 +89,7 @@ static SCM sym_ldap_sasl_automatic;
 static SCM sym_ldap_sasl_interactive;
 static SCM sym_ldap_sasl_quiet;
 
-SCM bind_ldap(SCM ld_scm, SCM rest) {
+SCM bind_ldap(SCM ld_scm, SCM bind_method, SCM rest) {
   scm_dynwind_begin(0);
   scm_assert_foreign_object_type(ldap_connection_type, ld_scm);
   ldap_connection_t *ldap = scm_foreign_object_ref(ld_scm, 0);
@@ -100,26 +100,21 @@ SCM bind_ldap(SCM ld_scm, SCM rest) {
 
   SCM bind_result = SCM_UNDEFINED;
 
-  SCM bind_method_scm = SCM_UNDEFINED;
   SCM name_scm = SCM_UNDEFINED; // DN, not used in SASL
   SCM cred_scm = SCM_UNDEFINED;
   
   scm_c_bind_keyword_arguments("bind-ldap", rest, 0,
-                               key_bind_method_param, &bind_method_scm,
                                key_name_param, &name_scm,
                                key_cred_param, &cred_scm,
                                SCM_UNDEFINED);
 
   // We'll parse parameters based on bind method, since each method uses these
   // options differently.
-  if (SCM_UNBNDP(bind_method_scm)) {
-    // Error!
-  }
   
   char *mechanism = NULL;
-  if (bind_method_scm == sym_ldap_bind_simple) {
+  if (bind_method == sym_ldap_bind_simple) {
     // null is the same as simple here.
-  } else if (bind_method_scm == sym_ldap_bind_sasl) {
+  } else if (bind_method == sym_ldap_bind_sasl) {
     // Get the mechanism
   } else {
     // Error!
@@ -146,7 +141,9 @@ SCM bind_ldap(SCM ld_scm, SCM rest) {
   // scm_dynwind_unwind_handler(free_berval, cred_bv, SCM_F_WIND_EXPLICITLY);
 
   struct berval *server_cred = NULL;
-  int result = ldap_sasl_bind_s(ldap->ld, name, mechanism, &cred_bv, NULL /* sctrls */, NULL /* cctrls */, &server_cred);
+  int result = ldap_sasl_bind_s(ldap->ld, name, mechanism, &cred_bv,
+                                NULL /* sctrls */, NULL /* cctrls */,
+                                &server_cred);
   scm_dynwind_unwind_handler(free_berval, server_cred, SCM_F_WIND_EXPLICITLY);
   if (result == 0) {
     ldap->bound = true;
@@ -334,7 +331,7 @@ void init_bind_symbols() {
 
 SCM init_gldap() {
   scm_c_define_gsubr("make-ldap", 1, 0, 0, make_ldap);
-  scm_c_define_gsubr("bind-ldap", 1, 0, 1, bind_ldap);
+  scm_c_define_gsubr("bind-ldap", 2, 0, 1, bind_ldap);
   scm_c_define_gsubr("unbind-ldap", 1, 0, 0, unbind_ldap);
   scm_c_define_gsubr("search-ldap", 1, 0, 1, search_ldap);
   init_keywords();
