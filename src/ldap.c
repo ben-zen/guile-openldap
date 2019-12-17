@@ -42,8 +42,8 @@ static int ldap_version = 3;
 
 static SCM ldap_connection_type;
 static SCM key_base_param;
-static SCM key_bind_method_param;
 static SCM key_cred_param;
+static SCM key_mechanism_param;
 static SCM key_name_param;
 static SCM key_scope_param;
 static SCM key_filter_param;
@@ -80,6 +80,11 @@ SCM make_ldap(SCM url_scm) {
   return scm_make_foreign_object_1(ldap_connection_type, ldap);
 }
 
+int sasl_interaction (LDAP *ld, unsigned int flags, void *defaults,
+                      void *sasl_interact) {
+
+}
+
 // Bind methods
 static SCM sym_ldap_bind_simple;
 static SCM sym_ldap_bind_sasl;
@@ -102,10 +107,12 @@ SCM bind_ldap(SCM ld_scm, SCM bind_method, SCM rest) {
 
   SCM name_scm = SCM_UNDEFINED; // DN, not used in SASL
   SCM cred_scm = SCM_UNDEFINED;
+  SCM mechanism_scm = SCM_UNDEFINED;
   
   scm_c_bind_keyword_arguments("bind-ldap", rest, 0,
                                key_name_param, &name_scm,
                                key_cred_param, &cred_scm,
+                               key_mechanism_param, &mechanism_scm,
                                SCM_UNDEFINED);
 
   // We'll parse parameters based on bind method, since each method uses these
@@ -116,6 +123,12 @@ SCM bind_ldap(SCM ld_scm, SCM bind_method, SCM rest) {
     // null is the same as simple here.
   } else if (bind_method == sym_ldap_bind_sasl) {
     // Get the mechanism
+    if (SCM_UNBNDP(mechanism_scm)) {
+      // Error!
+    }
+
+    mechanism = scm_to_utf8_stringn(mechanism_scm, NULL /* len */);
+    scm_dynwind_free(mechanism);
   } else {
     // Error!
   }
@@ -304,8 +317,8 @@ SCM search_ldap(SCM ldap_obj, SCM rest) {
 
 void init_keywords() {
   key_base_param = scm_from_utf8_keyword("base");
-  key_bind_method_param = scm_from_utf8_keyword("bind-method");
   key_cred_param = scm_from_utf8_keyword("cred");
+  key_mechanism_param = scm_from_utf8_keyword("mechanism");
   key_name_param = scm_from_utf8_keyword("name");
   key_scope_param = scm_from_utf8_keyword("scope");
   key_filter_param = scm_from_utf8_keyword("filter");
@@ -348,60 +361,3 @@ void print_berval(struct berval *val) {
     putchar(val_i);
   }
 };
-
-/*
-int main (int argc, char** argv) {
-  char *ldap_url = (argc > 1) ? argv[1] : "ldap://127.0.0.1:389/";
-  LDAP* ldap = NULL;
-  int err = ldap_initialize(&ldap, ldap_url);
-  err = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &ldap_version);
-  if (err != LDAP_OPT_SUCCESS) {
-    return err;
-  }
-
-  // search?
-  LDAPMessage *results = NULL;
-  err = ldap_search_ext_s(ldap, "ou=members,dc=example,dc=com",
-                          LDAP_SCOPE_ONELEVEL, "(uid=geoff)", NULL , //attrs[]
-                          0, // attrsonly
-                          NULL, // serverctrls
-                          NULL, 
-                          /* clientctrls, NULL /* timeout, 0 /* sizelimit, &results);
-
-  int count = ldap_count_messages(ldap, results);
-  printf("Received %i %s.\n", count, (count == 1) ? "result" : "results");
-
-  if (count == 0) {
-    return 0;
-  }
-
-  LDAPMessage *message = ldap_first_entry(ldap, results);
-
-  while (message != NULL) {
-    BerElement *ber = NULL;
-    char *attribute_name = ldap_first_attribute(ldap, message, &ber);
-    while (attribute_name != NULL) {
-      printf("Writing attribute: %s\n", attribute_name);
-      struct berval **values = ldap_get_values_len(ldap, message, attribute_name);
-      int values_count = ldap_count_values_len(values);
-      for (int i = 0; i < values_count; i++) {
-        puts("Attribute value: ");
-        print_berval(values[i]);
-        putchar('\n');
-      }
-
-      ldap_value_free_len(values);
-      ldap_memfree(attribute_name);
-      attribute_name = NULL;
-      attribute_name = ldap_next_attribute(ldap, message, ber);
-    }
-
-    ber_free(ber, 0);
-    message = ldap_next_entry(ldap, message);
-  }
-  
-  
-  ldap_msgfree(results);
-  return 0;
-}
-*/
