@@ -1,3 +1,6 @@
+// Copyright (C) 2019 Ben Lewis <zenrider@blacklodgeresearch.org>
+// Licensed as described in the LICENSE file.
+
 #include <ldap.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -38,22 +41,32 @@ typedef struct ldap_connection {
   bool bound;
 } ldap_connection_t;
 
-static int ldap_version = 3;
+int ldap_version = 3;
 
-static SCM ldap_connection_type;
-static SCM key_base_param;
-static SCM key_cred_param;
-static SCM key_mechanism_param;
-static SCM key_name_param;
-static SCM key_scope_param;
-static SCM key_filter_param;
-static SCM key_attrs_param;
-static SCM key_attrsonly_param;
-static SCM key_serverctrls_param;
-static SCM key_clientctrls_param;
-static SCM key_timeout_param;
-static SCM key_sizelimit_param;
+SCM ldap_connection_type;
 
+// Parameters
+SCM key_base_param;
+SCM key_cred_param;
+SCM key_mechanism_param;
+SCM key_name_param;
+SCM key_scope_param;
+SCM key_filter_param;
+SCM key_attrs_param;
+SCM key_attrsonly_param;
+SCM key_serverctrls_param;
+SCM key_clientctrls_param;
+SCM key_timeout_param;
+SCM key_sizelimit_param;
+
+// Bind methods
+SCM sym_ldap_bind_simple;
+SCM sym_ldap_bind_sasl;
+
+// LDAP SASL interaction
+SCM sym_ldap_sasl_automatic;
+SCM sym_ldap_sasl_interactive;
+SCM sym_ldap_sasl_quiet;
 
 void init_ldap_type (void) {
   SCM name = scm_from_utf8_symbol("ldap_connection");
@@ -84,15 +97,6 @@ int sasl_interaction (LDAP *ld, unsigned int flags, void *defaults,
                       void *sasl_interact) {
 
 }
-
-// Bind methods
-static SCM sym_ldap_bind_simple;
-static SCM sym_ldap_bind_sasl;
-
-// LDAP SASL interaction
-static SCM sym_ldap_sasl_automatic;
-static SCM sym_ldap_sasl_interactive;
-static SCM sym_ldap_sasl_quiet;
 
 SCM bind_ldap(SCM ld_scm, SCM bind_method, SCM rest) {
   scm_dynwind_begin(0);
